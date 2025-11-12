@@ -24,6 +24,7 @@ enum SplittingTunnelError: LocalizedError {
     case authorizationUnavailable
     case commandFailed(String)
     case databaseUnavailable(String)
+    case vpnGatewayUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -39,6 +40,8 @@ enum SplittingTunnelError: LocalizedError {
             return "配置流量分流时执行系统命令失败：\(message)"
         case .databaseUnavailable(let reason):
             return "无法加载中国 IP 数据：\(reason)"
+        case .vpnGatewayUnavailable:
+            return "无法解析当前 VPN 的网关地址，请重试或检查 VPN 配置。"
         }
     }
 }
@@ -324,6 +327,7 @@ final class SplittingTunnelManager {
 
     func enable(for service: SystemVPNService, completion: @escaping (Result<Void, Error>) -> Void) {
         queue.async {
+            AppLogger.shared.log("Enabling splitting tunnel for service \(service.name) (ID: \(service.id))")
             guard let vpnInterface = self.runtimeInterfaceName(for: service) else {
                 AppLogger.shared.log("Unable to determine runtime interface for service \(service.name).")
                 completion(.failure(SplittingTunnelError.missingVPNInterface))
@@ -333,8 +337,13 @@ final class SplittingTunnelManager {
             do {
                 AppLogger.shared.log("Enabling splitting tunnel for service \(service.name) vpnInterface=\(vpnInterface)")
                 let routeInfo = try self.routeFetcher.fetch()
-                let vpnGateway = self.resolveVPNGateway(for: service, interfaceName: vpnInterface)
-                AppLogger.shared.log("Route info: localInterface=\(routeInfo.localInterface), physicalGateway=\(routeInfo.physicalGateway), vpnGateway=\(vpnGateway ?? "nil")")
+                guard let vpnGateway = self.resolveVPNGateway(for: service, interfaceName: vpnInterface),
+                      !vpnGateway.isEmpty else {
+                    AppLogger.shared.log("Unable to resolve VPN gateway for interface \(vpnInterface). Aborting splitting tunnel enablement.")
+                    completion(.failure(SplittingTunnelError.vpnGatewayUnavailable))
+                    return
+                }
+                AppLogger.shared.log("Route info: localInterface=\(routeInfo.localInterface), physicalGateway=\(routeInfo.physicalGateway), vpnGateway=\(vpnGateway)")
                 let chinaListURL = try awaitResult { try await self.chinaDatabase.ensureDatabase() }
                 try self.writeAnchorFile(localInterface: routeInfo.localInterface,
                                           physicalGateway: routeInfo.physicalGateway,
@@ -342,6 +351,7 @@ final class SplittingTunnelManager {
                                           vpnGateway: vpnGateway,
                                           chinaListPath: chinaListURL.path)
                 guard let runner = self.commandRunner else {
+                    AppLogger.shared.log("Failed to get privileged command runner")
                     completion(.failure(SplittingTunnelError.authorizationUnavailable))
                     return
                 }
@@ -359,10 +369,12 @@ final class SplittingTunnelManager {
 
     private func runtimeInterfaceName(for service: SystemVPNService) -> String? {
         if let bsd = service.interfaceBSDName, !bsd.isEmpty {
+            AppLogger.shared.log("Using known BSD name for service \(service.name): \(bsd)")
             return bsd
         }
 
         guard let store = SCDynamicStoreCreate(nil, "VPN Manager" as CFString, nil, nil) else {
+            AppLogger.shared.log("Could not create SCDynamicStore for service \(service.name)")
             return nil
         }
 
@@ -389,6 +401,7 @@ final class SplittingTunnelManager {
     func disable(completion: @escaping (Result<Void, Error>) -> Void) {
         queue.async {
             guard self.isActiveState else {
+                AppLogger.shared.log("Splitting tunnel is already disabled, nothing to do")
                 completion(.success(()))
                 return
             }
@@ -396,6 +409,7 @@ final class SplittingTunnelManager {
             do {
                 AppLogger.shared.log("Disabling splitting tunnel.")
                 guard let runner = self.commandRunner else {
+                    AppLogger.shared.log("Failed to get privileged command runner for disabling")
                     throw SplittingTunnelError.authorizationUnavailable
                 }
                 try runner.flushAnchor(self.anchorName)
@@ -412,14 +426,9 @@ final class SplittingTunnelManager {
     private func writeAnchorFile(localInterface: String,
                                  physicalGateway: String,
                                  vpnInterface: String,
-                                 vpnGateway: String?,
+                                 vpnGateway: String,
                                  chinaListPath: String) throws {
-        let routeTarget: String
-        if let gateway = vpnGateway, !gateway.isEmpty {
-            routeTarget = "(\(vpnInterface) \(gateway))"
-        } else {
-            routeTarget = "(\(vpnInterface))"
-        }
+        let routeTarget = "(\(vpnInterface) \(vpnGateway))"
         AppLogger.shared.log("Writing PF anchor route-to target: \(routeTarget)")
 
         let localRouteTarget = "(\(localInterface) \(physicalGateway))"
@@ -428,18 +437,20 @@ final class SplittingTunnelManager {
         // Rules intentionally avoid ALTQ/queue directives so they can run on kernels
         // without traffic-shaping support (macOS disables ALTQ in shipping kernels).
         let anchor = """
-        table <vpnmanager_cn> persist file "\(chinaListPath)"
+        table <vpnmanager_cn> persist file \"\(chinaListPath)\"
 
         pass out quick on lo0 all keep state
         pass out quick on \(localInterface) route-to \(localRouteTarget) to <vpnmanager_cn> keep state
         pass out quick on \(localInterface) route-to \(routeTarget) from any to ! <vpnmanager_cn> keep state
         """
         let anchoredText = anchor.hasSuffix("\n") ? anchor : anchor + "\n"
+        AppLogger.shared.log("Writing anchor file to: \(anchorFileURL.path)")
         try anchoredText.write(to: anchorFileURL, atomically: true, encoding: .utf8)
         AppLogger.shared.log("Wrote PF anchor file at \(anchorFileURL.path)")
     }
 
     private func resolveVPNGateway(for service: SystemVPNService, interfaceName: String) -> String? {
+        AppLogger.shared.log("Resolving VPN gateway for service \(service.name) on interface \(interfaceName)")
         if let store = SCDynamicStoreCreate(nil, "VPN Manager" as CFString, nil, nil) {
             let ipv4Key = "State:/Network/Service/\(service.id)/IPv4" as CFString
             if let ipv4 = SCDynamicStoreCopyValue(store, ipv4Key) as? [String: Any],
@@ -461,7 +472,7 @@ final class SplittingTunnelManager {
             return peer
         }
 
-        AppLogger.shared.log("Unable to resolve VPN gateway for interface \(interfaceName). Will omit gateway in PF rules.")
+        AppLogger.shared.log("Unable to resolve VPN gateway for interface \(interfaceName).")
         return nil
     }
 
@@ -489,6 +500,7 @@ final class SplittingTunnelManager {
     }
 
     private func inferGatewayViaIfconfig(interfaceName: String) -> String? {
+        AppLogger.shared.log("Attempting to infer gateway via ifconfig for interface: \(interfaceName)")
         let process = Process()
         process.launchPath = "/sbin/ifconfig"
         process.arguments = [interfaceName]
@@ -507,16 +519,19 @@ final class SplittingTunnelManager {
 
         let data = pipe.fileHandleForReading.readDataToEndOfFile()
         guard let output = String(data: data, encoding: .utf8), !output.isEmpty else {
+            AppLogger.shared.log("No output from ifconfig for interface \(interfaceName)")
             return nil
         }
 
         for rawLine in output.split(whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             if let gateway = Self.parseGateway(fromIfconfigLine: line) {
+                AppLogger.shared.log("Found gateway from ifconfig for \(interfaceName): \(gateway)")
                 return gateway
             }
         }
 
+        AppLogger.shared.log("Could not find gateway from ifconfig output for interface \(interfaceName)")
         return nil
     }
 

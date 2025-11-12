@@ -8,6 +8,7 @@
 import SwiftUI
 import AppKit
 import SystemConfiguration
+import Foundation
 
 @main
 struct VPN_ManagerApp: App {
@@ -48,13 +49,25 @@ class VPNManager: NSObject {
     }
 
     func connectVPN(_ service: SystemVPNService, completion: ((Error?) -> Void)? = nil) {
+        AppLogger.shared.log("Attempting to connect VPN: \(service.name) (ID: \(service.id))")
         runScutilCommand(arguments: ["--nc", "start", service.name]) { error in
+            if let error = error {
+                AppLogger.shared.log("Failed to connect VPN \(service.name): \(error.localizedDescription)")
+            } else {
+                AppLogger.shared.log("Successfully initiated connection for VPN: \(service.name)")
+            }
             completion?(error)
         }
     }
 
     func disconnectVPN(_ service: SystemVPNService, completion: ((Error?) -> Void)? = nil) {
+        AppLogger.shared.log("Attempting to disconnect VPN: \(service.name) (ID: \(service.id))")
         runScutilCommand(arguments: ["--nc", "stop", service.name]) { error in
+            if let error = error {
+                AppLogger.shared.log("Failed to disconnect VPN \(service.name): \(error.localizedDescription)")
+            } else {
+                AppLogger.shared.log("Successfully initiated disconnection for VPN: \(service.name)")
+            }
             completion?(error)
         }
     }
@@ -79,14 +92,16 @@ class VPNManager: NSObject {
     }
 
     private func fetchSystemVPNServices() -> [SystemVPNService] {
+        AppLogger.shared.log("Starting to fetch system VPN services")
         guard
             let preferences = SCPreferencesCreate(nil, "VPN Manager" as CFString, nil),
             let services = SCNetworkServiceCopyAll(preferences) as? [SCNetworkService]
         else {
+            AppLogger.shared.log("Failed to fetch system VPN services - could not create preferences or services")
             return []
         }
 
-        return services.compactMap { service in
+        let result = services.compactMap { service -> SystemVPNService? in
             guard
                 let interface = SCNetworkServiceGetInterface(service),
                 self.isVPNInterface(interface)
@@ -99,6 +114,8 @@ class VPNManager: NSObject {
             let description = self.interfaceDisplayName(for: interface)
             let bsdName = SCNetworkInterfaceGetBSDName(interface) as String?
 
+            AppLogger.shared.log("Found VPN service: \(name) (ID: \(serviceID)), interface: \(description), BSD name: \(bsdName ?? "N/A")")
+            
             return SystemVPNService(
                 id: serviceID,
                 name: name,
@@ -106,6 +123,9 @@ class VPNManager: NSObject {
                 interfaceBSDName: bsdName
             )
         }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        
+        AppLogger.shared.log("Finished fetching system VPN services, found \(result.count) VPN services")
+        return result
     }
 
     private func isVPNInterface(_ interface: SCNetworkInterface) -> Bool {
@@ -139,12 +159,15 @@ class VPNManager: NSObject {
 
     private func runScutilCommand(arguments: [String], completion: @escaping (Error?) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
+            AppLogger.shared.log("Executing scutil command: \(arguments.joined(separator: " "))")
             do {
-                _ = try self.executeScutil(arguments: arguments)
+                let output = try self.executeScutil(arguments: arguments)
+                AppLogger.shared.log("Scutil command completed successfully: \(arguments.joined(separator: " ")), output: \(output.prefix(200))...")
                 DispatchQueue.main.async {
                     completion(nil)
                 }
             } catch {
+                AppLogger.shared.log("Scutil command failed: \(arguments.joined(separator: " ")), error: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     completion(error)
                 }
@@ -161,13 +184,16 @@ class VPNManager: NSObject {
         process.standardOutput = outputPipe
         process.standardError = outputPipe
 
+        AppLogger.shared.log("Starting scutil process with arguments: \(arguments)")
         try process.run()
         process.waitUntilExit()
+        AppLogger.shared.log("Scutil process terminated with status: \(process.terminationStatus)")
 
         let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
         let output = String(data: data, encoding: .utf8) ?? ""
 
         if process.terminationStatus != 0 {
+            AppLogger.shared.log("Scutil command failed with termination status \(process.terminationStatus), output: \(output.trimmingCharacters(in: .whitespacesAndNewlines))")
             throw NSError(
                 domain: "VPNManager",
                 code: Int(process.terminationStatus),
@@ -175,17 +201,23 @@ class VPNManager: NSObject {
             )
         }
 
+        AppLogger.shared.log("Scutil command succeeded, output length: \(output.count) characters")
         return output
     }
 
     private func vpnStatus(for service: SystemVPNService) -> VPNConnectionStatus {
+        AppLogger.shared.log("Checking status for VPN: \(service.name)")
         do {
             let output = try executeScutil(arguments: ["--nc", "status", service.name])
             guard let firstLine = output.components(separatedBy: .newlines).first else {
+                AppLogger.shared.log("Could not get status from output for VPN: \(service.name)")
                 return .unknown
             }
 
-            switch firstLine.lowercased() {
+            let status = firstLine.lowercased()
+            AppLogger.shared.log("Got status for VPN \(service.name): \(status)")
+            
+            switch status {
             case "connected":
                 return .connected
             case "connecting":
@@ -198,7 +230,28 @@ class VPNManager: NSObject {
                 return .unknown
             }
         } catch {
+            AppLogger.shared.log("Error checking status for VPN \(service.name): \(error.localizedDescription)")
             return .unknown
+        }
+    }
+
+    func waitForStatus(for service: SystemVPNService,
+                       desiredStatus: VPNConnectionStatus,
+                       timeout: TimeInterval = 15,
+                       pollInterval: TimeInterval = 0.5,
+                       completion: @escaping (VPNConnectionStatus) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let deadline = Date().addingTimeInterval(timeout)
+            var currentStatus = self.connectionStatus(for: service)
+
+            while Date() < deadline && currentStatus != desiredStatus {
+                Thread.sleep(forTimeInterval: pollInterval)
+                currentStatus = self.connectionStatus(for: service)
+            }
+
+            DispatchQueue.main.async {
+                completion(currentStatus)
+            }
         }
     }
 }
@@ -340,6 +393,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
     }
 
     private func applyVPNConfigurations(servicesWithStatus: [(SystemVPNService, VPNManager.VPNConnectionStatus)], menu: NSMenu) {
+        AppLogger.shared.log("Applying VPN configurations, count: \(servicesWithStatus.count)")
         var detectedConnectedService: SystemVPNService?
         var prioritizedStatus: VPNManager.VPNConnectionStatus = .disconnected
 
@@ -360,6 +414,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
 
         // 如果没有VPN配置，显示提示信息
         if servicesWithStatus.isEmpty {
+            AppLogger.shared.log("No VPN configurations found")
             let noVPNItem = NSMenuItem(title: "No VPN Configurations", action: nil, keyEquivalent: "")
             noVPNItem.isEnabled = false
             menu.insertItem(noVPNItem, at: menu.items.count - 5)
@@ -369,6 +424,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
 
         // 添加新的VPN控制视图
         for (service, status) in servicesWithStatus {
+            AppLogger.shared.log("Processing VPN service: \(service.name) (ID: \(service.id)), status: \(statusDescription(status))")
             if status == .connected {
                 detectedConnectedService = service
                 prioritizedStatus = .connected
@@ -381,6 +437,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
             // 创建VPN控制视图
             let vpnControlView = VPNControlView(vpnService: service, vpnManager: vpnManager) { [weak self] in
                 // 状态改变后的回调
+                AppLogger.shared.log("VPN status changed for service: \(service.name), reloading configurations")
                 self?.loadVPNConfigurations(menu: menu)
             }
 
@@ -390,6 +447,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
             // 创建包含自定义视图的菜单项
             let vpnItem = NSMenuItem()
             vpnItem.view = vpnControlView
+            vpnItem.toolTip = service.name // 添加工具提示
             menu.insertItem(vpnItem, at: menu.items.count - 5)
             vpnMenuItems.append(vpnItem)
             vpnControlViews.append(vpnControlView)
@@ -425,12 +483,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
     }
     
     func menuWillOpen(_ menu: NSMenu) {
-        guard menu == statusBarItem?.menu else { return }
+        AppLogger.shared.log("Menu will open, reloading VPN configurations")
+        guard menu == statusBarItem?.menu else { 
+            AppLogger.shared.log("Menu is not the status bar menu, skipping reload")
+            return 
+        }
         loadVPNConfigurations(menu: menu)
     }
     
     @objc func toggleVPNConnection(_ sender: NSMenuItem) {
-        guard let service = sender.representedObject as? SystemVPNService else { return }
+        guard let service = sender.representedObject as? SystemVPNService else { 
+            AppLogger.shared.log("Failed to get VPN service from menu item")
+            return 
+        }
         let status = vpnManager.connectionStatus(for: service)
         AppLogger.shared.log("Toggle VPN action for '\(service.name)' current status=\(statusDescription(status))")
         
@@ -499,7 +564,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
     }
     
     @objc func toggleSplittingTunnel() {
-        guard !splittingTunnelOperationInProgress else { return }
+        guard !splittingTunnelOperationInProgress else { 
+            AppLogger.shared.log("Splitting tunnel operation already in progress, skipping request")
+            return 
+        }
         let targetState = !isSplittingTunnelEnabled
         let previousState = isSplittingTunnelEnabled
         AppLogger.shared.log("User toggled Splitting Tunnel -> \(targetState ? "Enable" : "Disable")")
@@ -533,6 +601,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
     }
     
     private func handleSplittingTunnelCompletion(_ result: Result<Void, Error>, targetState: Bool, previousState: Bool) {
+        AppLogger.shared.log("Handling splitting tunnel completion, target state: \(targetState)")
         splittingTunnelOperationInProgress = false
         splittingTunnelMenuItem?.isEnabled = true
         
