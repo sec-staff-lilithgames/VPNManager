@@ -1,0 +1,546 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		148072CF2EC3404C00F13A17 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 148072B82EC3404B00F13A17 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 148072BF2EC3404B00F13A17;
+			remoteInfo = "VPN Manager";
+		};
+		148072D92EC3404C00F13A17 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 148072B82EC3404B00F13A17 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 148072BF2EC3404B00F13A17;
+			remoteInfo = "VPN Manager";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		148072C02EC3404B00F13A17 /* VPN Manager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "VPN Manager.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		148072CE2EC3404C00F13A17 /* VPN ManagerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "VPN ManagerTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		148072D82EC3404C00F13A17 /* VPN ManagerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "VPN ManagerUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		148072C22EC3404B00F13A17 /* VPN Manager */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "VPN Manager";
+			sourceTree = "<group>";
+		};
+		148072D12EC3404C00F13A17 /* VPN ManagerTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "VPN ManagerTests";
+			sourceTree = "<group>";
+		};
+		148072DB2EC3404C00F13A17 /* VPN ManagerUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "VPN ManagerUITests";
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		148072BD2EC3404B00F13A17 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		148072CB2EC3404C00F13A17 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		148072D52EC3404C00F13A17 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		148072B72EC3404B00F13A17 = {
+			isa = PBXGroup;
+			children = (
+				148072C22EC3404B00F13A17 /* VPN Manager */,
+				148072D12EC3404C00F13A17 /* VPN ManagerTests */,
+				148072DB2EC3404C00F13A17 /* VPN ManagerUITests */,
+				148072C12EC3404B00F13A17 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		148072C12EC3404B00F13A17 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				148072C02EC3404B00F13A17 /* VPN Manager.app */,
+				148072CE2EC3404C00F13A17 /* VPN ManagerTests.xctest */,
+				148072D82EC3404C00F13A17 /* VPN ManagerUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		148072BF2EC3404B00F13A17 /* VPN Manager */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 148072E22EC3404C00F13A17 /* Build configuration list for PBXNativeTarget "VPN Manager" */;
+			buildPhases = (
+				148072BC2EC3404B00F13A17 /* Sources */,
+				148072BD2EC3404B00F13A17 /* Frameworks */,
+				148072BE2EC3404B00F13A17 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				148072C22EC3404B00F13A17 /* VPN Manager */,
+			);
+			name = "VPN Manager";
+			packageProductDependencies = (
+			);
+			productName = "VPN Manager";
+			productReference = 148072C02EC3404B00F13A17 /* VPN Manager.app */;
+			productType = "com.apple.product-type.application";
+		};
+		148072CD2EC3404C00F13A17 /* VPN ManagerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 148072E52EC3404C00F13A17 /* Build configuration list for PBXNativeTarget "VPN ManagerTests" */;
+			buildPhases = (
+				148072CA2EC3404C00F13A17 /* Sources */,
+				148072CB2EC3404C00F13A17 /* Frameworks */,
+				148072CC2EC3404C00F13A17 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				148072D02EC3404C00F13A17 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				148072D12EC3404C00F13A17 /* VPN ManagerTests */,
+			);
+			name = "VPN ManagerTests";
+			packageProductDependencies = (
+			);
+			productName = "VPN ManagerTests";
+			productReference = 148072CE2EC3404C00F13A17 /* VPN ManagerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		148072D72EC3404C00F13A17 /* VPN ManagerUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 148072E82EC3404C00F13A17 /* Build configuration list for PBXNativeTarget "VPN ManagerUITests" */;
+			buildPhases = (
+				148072D42EC3404C00F13A17 /* Sources */,
+				148072D52EC3404C00F13A17 /* Frameworks */,
+				148072D62EC3404C00F13A17 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				148072DA2EC3404C00F13A17 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				148072DB2EC3404C00F13A17 /* VPN ManagerUITests */,
+			);
+			name = "VPN ManagerUITests";
+			packageProductDependencies = (
+			);
+			productName = "VPN ManagerUITests";
+			productReference = 148072D82EC3404C00F13A17 /* VPN ManagerUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		148072B82EC3404B00F13A17 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+				TargetAttributes = {
+					148072BF2EC3404B00F13A17 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					148072CD2EC3404C00F13A17 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 148072BF2EC3404B00F13A17;
+					};
+					148072D72EC3404C00F13A17 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = 148072BF2EC3404B00F13A17;
+					};
+				};
+			};
+			buildConfigurationList = 148072BB2EC3404B00F13A17 /* Build configuration list for PBXProject "VPN Manager" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 148072B72EC3404B00F13A17;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 148072C12EC3404B00F13A17 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				148072BF2EC3404B00F13A17 /* VPN Manager */,
+				148072CD2EC3404C00F13A17 /* VPN ManagerTests */,
+				148072D72EC3404C00F13A17 /* VPN ManagerUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		148072BE2EC3404B00F13A17 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		148072CC2EC3404C00F13A17 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		148072D62EC3404C00F13A17 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		148072BC2EC3404B00F13A17 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		148072CA2EC3404C00F13A17 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		148072D42EC3404C00F13A17 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		148072D02EC3404C00F13A17 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 148072BF2EC3404B00F13A17 /* VPN Manager */;
+			targetProxy = 148072CF2EC3404C00F13A17 /* PBXContainerItemProxy */;
+		};
+		148072DA2EC3404C00F13A17 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 148072BF2EC3404B00F13A17 /* VPN Manager */;
+			targetProxy = 148072D92EC3404C00F13A17 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		148072E02EC3404C00F13A17 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		148072E12EC3404C00F13A17 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		148072E32EC3404C00F13A17 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "VPN Manager/VPN_Manager.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "siberia-1337.VPN-Manager";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		148072E42EC3404C00F13A17 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "VPN Manager/VPN_Manager.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "siberia-1337.VPN-Manager";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		148072E62EC3404C00F13A17 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "siberia-1337.VPN-ManagerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VPN Manager.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/VPN Manager";
+			};
+			name = Debug;
+		};
+		148072E72EC3404C00F13A17 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "siberia-1337.VPN-ManagerTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VPN Manager.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/VPN Manager";
+			};
+			name = Release;
+		};
+		148072E92EC3404C00F13A17 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "siberia-1337.VPN-ManagerUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "VPN Manager";
+			};
+			name = Debug;
+		};
+		148072EA2EC3404C00F13A17 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "siberia-1337.VPN-ManagerUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = "VPN Manager";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		148072BB2EC3404B00F13A17 /* Build configuration list for PBXProject "VPN Manager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				148072E02EC3404C00F13A17 /* Debug */,
+				148072E12EC3404C00F13A17 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		148072E22EC3404C00F13A17 /* Build configuration list for PBXNativeTarget "VPN Manager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				148072E32EC3404C00F13A17 /* Debug */,
+				148072E42EC3404C00F13A17 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		148072E52EC3404C00F13A17 /* Build configuration list for PBXNativeTarget "VPN ManagerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				148072E62EC3404C00F13A17 /* Debug */,
+				148072E72EC3404C00F13A17 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		148072E82EC3404C00F13A17 /* Build configuration list for PBXNativeTarget "VPN ManagerUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				148072E92EC3404C00F13A17 /* Debug */,
+				148072EA2EC3404C00F13A17 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 148072B82EC3404B00F13A17 /* Project object */;
+}

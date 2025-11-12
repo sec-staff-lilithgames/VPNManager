@@ -1,0 +1,560 @@
+//
+//  VPN_ManagerApp.swift
+//  VPN Manager
+//
+//  Created by Siberia_1337 on 11/11/25.
+//
+
+import SwiftUI
+import AppKit
+import SystemConfiguration
+
+@main
+struct VPN_ManagerApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    var body: some Scene {
+        Settings {
+            EmptyView()
+        }
+    }
+}
+
+class VPNManager: NSObject {
+    enum VPNConnectionStatus {
+        case connected
+        case connecting
+        case disconnecting
+        case disconnected
+        case unknown
+    }
+
+    private let appVPNInterfaceType = "VPN" // kSCNetworkInterfaceTypeVPN lacks a Swift symbol on macOS
+
+    private lazy var vpnInterfaceTypes: Set<String> = [
+        kSCNetworkInterfaceTypePPP as String,
+        kSCNetworkInterfaceTypeIPSec as String,
+        kSCNetworkInterfaceTypeL2TP as String,
+        appVPNInterfaceType
+    ]
+
+    func loadVPNs(completion: @escaping ([SystemVPNService]) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let services = self.fetchSystemVPNServices()
+            DispatchQueue.main.async {
+                completion(services)
+            }
+        }
+    }
+
+    func connectVPN(_ service: SystemVPNService, completion: ((Error?) -> Void)? = nil) {
+        runScutilCommand(arguments: ["--nc", "start", service.name]) { error in
+            completion?(error)
+        }
+    }
+
+    func disconnectVPN(_ service: SystemVPNService, completion: ((Error?) -> Void)? = nil) {
+        runScutilCommand(arguments: ["--nc", "stop", service.name]) { error in
+            completion?(error)
+        }
+    }
+
+    func connectionStatus(for service: SystemVPNService) -> VPNConnectionStatus {
+        return vpnStatus(for: service)
+    }
+    
+    func getVPNStatusText(_ service: SystemVPNService) -> String {
+        switch connectionStatus(for: service) {
+        case .connected:
+            return "Connected"
+        case .connecting:
+            return "Connecting..."
+        case .disconnecting:
+            return "Disconnecting..."
+        case .disconnected:
+            return "Not Connected"
+        case .unknown:
+            return "Unknown"
+        }
+    }
+
+    private func fetchSystemVPNServices() -> [SystemVPNService] {
+        guard
+            let preferences = SCPreferencesCreate(nil, "VPN Manager" as CFString, nil),
+            let services = SCNetworkServiceCopyAll(preferences) as? [SCNetworkService]
+        else {
+            return []
+        }
+
+        return services.compactMap { service in
+            guard
+                let interface = SCNetworkServiceGetInterface(service),
+                self.isVPNInterface(interface)
+            else {
+                return nil
+            }
+
+            let name = SCNetworkServiceGetName(service) as String? ?? "VPN"
+            let serviceID = SCNetworkServiceGetServiceID(service) as String? ?? UUID().uuidString
+            let description = self.interfaceDisplayName(for: interface)
+            let bsdName = SCNetworkInterfaceGetBSDName(interface) as String?
+
+            return SystemVPNService(
+                id: serviceID,
+                name: name,
+                interfaceDescription: description,
+                interfaceBSDName: bsdName
+            )
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func isVPNInterface(_ interface: SCNetworkInterface) -> Bool {
+        var currentInterface: SCNetworkInterface? = interface
+
+        while let candidate = currentInterface {
+            if
+                let type = SCNetworkInterfaceGetInterfaceType(candidate) as String?,
+                vpnInterfaceTypes.contains(type)
+            {
+                return true
+            }
+
+            currentInterface = SCNetworkInterfaceGetInterface(candidate)
+        }
+
+        return false
+    }
+
+    private func interfaceDisplayName(for interface: SCNetworkInterface) -> String {
+        if let localized = SCNetworkInterfaceGetLocalizedDisplayName(interface) as String?, !localized.isEmpty {
+            return localized
+        }
+
+        if let type = SCNetworkInterfaceGetInterfaceType(interface) as String?, !type.isEmpty {
+            return type == appVPNInterfaceType ? "App VPN" : type
+        }
+
+        return "VPN"
+    }
+
+    private func runScutilCommand(arguments: [String], completion: @escaping (Error?) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                _ = try self.executeScutil(arguments: arguments)
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(error)
+                }
+            }
+        }
+    }
+
+    private func executeScutil(arguments: [String]) throws -> String {
+        let process = Process()
+        process.launchPath = "/usr/sbin/scutil"
+        process.arguments = arguments
+
+        let outputPipe = Pipe()
+        process.standardOutput = outputPipe
+        process.standardError = outputPipe
+
+        try process.run()
+        process.waitUntilExit()
+
+        let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? ""
+
+        if process.terminationStatus != 0 {
+            throw NSError(
+                domain: "VPNManager",
+                code: Int(process.terminationStatus),
+                userInfo: [NSLocalizedDescriptionKey: output.trimmingCharacters(in: .whitespacesAndNewlines)]
+            )
+        }
+
+        return output
+    }
+
+    private func vpnStatus(for service: SystemVPNService) -> VPNConnectionStatus {
+        do {
+            let output = try executeScutil(arguments: ["--nc", "status", service.name])
+            guard let firstLine = output.components(separatedBy: .newlines).first else {
+                return .unknown
+            }
+
+            switch firstLine.lowercased() {
+            case "connected":
+                return .connected
+            case "connecting":
+                return .connecting
+            case "disconnecting":
+                return .disconnecting
+            case "disconnected":
+                return .disconnected
+            default:
+                return .unknown
+            }
+        } catch {
+            return .unknown
+        }
+    }
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDelegate {
+    private var statusBarItem: NSStatusItem?
+    private var splittingTunnelMenuItem: NSMenuItem?
+    private var isSplittingTunnelEnabled = false
+    private let vpnManager = VPNManager()
+    private let splittingTunnelManager = SplittingTunnelManager()
+    private var connectedVPNService: SystemVPNService?
+    private var splittingTunnelOperationInProgress = false
+    private var vpnMenuItems: [NSMenuItem] = []
+    private var vpnStatusItems: [NSMenuItem] = []
+    private var vpnControlViews: [VPNControlView] = []
+    
+    // MARK: - VPNControlDelegate
+    func setConnectedVPNService(_ service: SystemVPNService?) {
+        connectedVPNService = service
+        // 更新状态栏图标
+        currentVPNStatus = service != nil ? .connected : .disconnected
+    }
+    
+    func getConnectedVPNService() -> SystemVPNService? {
+        return connectedVPNService
+    }
+    
+    private var currentVPNStatus: VPNManager.VPNConnectionStatus = .disconnected {
+        didSet {
+            if oldValue != currentVPNStatus {
+                AppLogger.shared.log("VPN status changed from \(statusDescription(oldValue)) to \(statusDescription(currentVPNStatus))")
+            }
+            updateStatusBarIcon()
+        }
+    }
+    
+    private func updateStatusBarIcon() {
+        guard let button = statusBarItem?.button else { return }
+        
+        if currentVPNStatus == .connected {
+            applySymbolImage(
+                to: button,
+                symbolName: "network",
+                description: "VPN Manager (Connected)",
+                paletteColors: [NSColor.systemGreen]
+            )
+        } else {
+            applySymbolImage(
+                to: button,
+                symbolName: "network",
+                description: "VPN Manager (Disconnected)",
+                paletteColors: nil
+            )
+        }
+    }
+
+    private func applySymbolImage(
+        to button: NSStatusBarButton,
+        symbolName: String,
+        description: String,
+        paletteColors: [NSColor]?
+    ) {
+        guard var image = NSImage(systemSymbolName: symbolName, accessibilityDescription: description) else {
+            return
+        }
+        
+        if let paletteColors = paletteColors {
+            if let configured = image.withSymbolConfiguration(.init(paletteColors: paletteColors)) {
+                image = configured
+            }
+            image.isTemplate = false
+        } else {
+            image.isTemplate = true
+        }
+        
+        button.image = image
+        button.contentTintColor = paletteColors?.first
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Run as accessory (menu bar only) so the Dock icon is hidden
+        NSApplication.shared.setActivationPolicy(.accessory)
+        AppLogger.shared.log("Application launched. Splitting tunnel enabled: \(isSplittingTunnelEnabled)")
+
+        // 创建菜单栏图标
+        statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        
+        // 初始化图标状态
+        updateStatusBarIcon()
+        
+        if let button = statusBarItem?.button {
+            button.action = #selector(statusBarButtonClicked)
+        }
+        
+        // 创建菜单
+        let menu = NSMenu()
+        menu.delegate = self
+        menu.addItem(NSMenuItem(title: "VPN Manager", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        
+        // 添加Splitting Tunnel选项
+        splittingTunnelMenuItem = NSMenuItem(title: "Splitting Tunnel", action: #selector(toggleSplittingTunnel), keyEquivalent: "")
+        splittingTunnelMenuItem?.state = isSplittingTunnelEnabled ? .on : .off
+        menu.addItem(splittingTunnelMenuItem!)
+        
+        // 添加VPN列表分隔符
+        menu.addItem(NSMenuItem.separator())
+        
+        // 加载VPN配置
+        loadVPNConfigurations(menu: menu)
+        
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Open Network Preferences...", action: #selector(openNetworkPreferences), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "Quit VPN Manager", action: #selector(quitApp), keyEquivalent: "q"))
+
+        statusBarItem?.menu = menu
+    }
+    
+    private func loadVPNConfigurations(menu: NSMenu) {
+        AppLogger.shared.log("Requesting VPN configurations...")
+        vpnManager.loadVPNs { [weak self] vpnServices in
+            guard let self = self else { return }
+            AppLogger.shared.log("Received \(vpnServices.count) VPN configurations.")
+
+            let servicesSnapshot = vpnServices
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self = self else { return }
+                let servicesWithStatus = servicesSnapshot.map { service in
+                    (service, self.vpnManager.connectionStatus(for: service))
+                }
+
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.applyVPNConfigurations(servicesWithStatus: servicesWithStatus, menu: menu)
+                }
+            }
+        }
+    }
+
+    private func applyVPNConfigurations(servicesWithStatus: [(SystemVPNService, VPNManager.VPNConnectionStatus)], menu: NSMenu) {
+        var detectedConnectedService: SystemVPNService?
+        var prioritizedStatus: VPNManager.VPNConnectionStatus = .disconnected
+
+        // 清除旧的VPN菜单项
+        for item in vpnMenuItems {
+            menu.removeItem(item)
+        }
+        vpnMenuItems.removeAll()
+
+        // 清除旧的VPN状态菜单项
+        for item in vpnStatusItems {
+            menu.removeItem(item)
+        }
+        vpnStatusItems.removeAll()
+
+        // 清除旧的VPN控制视图
+        vpnControlViews.removeAll()
+
+        // 如果没有VPN配置，显示提示信息
+        if servicesWithStatus.isEmpty {
+            let noVPNItem = NSMenuItem(title: "No VPN Configurations", action: nil, keyEquivalent: "")
+            noVPNItem.isEnabled = false
+            menu.insertItem(noVPNItem, at: menu.items.count - 5)
+            vpnMenuItems.append(noVPNItem)
+            return
+        }
+
+        // 添加新的VPN控制视图
+        for (service, status) in servicesWithStatus {
+            if status == .connected {
+                detectedConnectedService = service
+                prioritizedStatus = .connected
+            } else if prioritizedStatus != .connected {
+                if status == .connecting || status == .disconnecting {
+                    prioritizedStatus = status
+                }
+            }
+
+            // 创建VPN控制视图
+            let vpnControlView = VPNControlView(vpnService: service, vpnManager: vpnManager) { [weak self] in
+                // 状态改变后的回调
+                self?.loadVPNConfigurations(menu: menu)
+            }
+
+            // 设置代理
+            vpnControlView.setParentDelegate(self)
+
+            // 创建包含自定义视图的菜单项
+            let vpnItem = NSMenuItem()
+            vpnItem.view = vpnControlView
+            menu.insertItem(vpnItem, at: menu.items.count - 5)
+            vpnMenuItems.append(vpnItem)
+            vpnControlViews.append(vpnControlView)
+
+            // 分隔符
+            let separator = NSMenuItem.separator()
+            menu.insertItem(separator, at: menu.items.count - 5)
+            vpnMenuItems.append(separator)
+        }
+
+        connectedVPNService = detectedConnectedService
+        currentVPNStatus = prioritizedStatus
+        ensureSplittingTunnelAvailability()
+        AppLogger.shared.log("Post-refresh status: \(statusDescription(prioritizedStatus)), connected service: \(detectedConnectedService?.name ?? "none"), splitting enabled: \(isSplittingTunnelEnabled)")
+    }
+
+    private func ensureSplittingTunnelAvailability() {
+        guard isSplittingTunnelEnabled else { return }
+        guard let _ = connectedVPNService, currentVPNStatus == .connected else {
+            AppLogger.shared.log("Splitting tunnel auto-disable: VPN not connected.")
+            if splittingTunnelManager.isActive {
+                splittingTunnelManager.disable { _ in }
+            }
+            isSplittingTunnelEnabled = false
+            splittingTunnelMenuItem?.state = .off
+            return
+        }
+    }
+
+    @objc func statusBarButtonClicked() {
+        guard let menu = statusBarItem?.menu else { return }
+        loadVPNConfigurations(menu: menu)
+    }
+    
+    func menuWillOpen(_ menu: NSMenu) {
+        guard menu == statusBarItem?.menu else { return }
+        loadVPNConfigurations(menu: menu)
+    }
+    
+    @objc func toggleVPNConnection(_ sender: NSMenuItem) {
+        guard let service = sender.representedObject as? SystemVPNService else { return }
+        let status = vpnManager.connectionStatus(for: service)
+        AppLogger.shared.log("Toggle VPN action for '\(service.name)' current status=\(statusDescription(status))")
+        
+        switch status {
+        case .connected:
+            vpnManager.disconnectVPN(service) { [weak self] error in
+                if let error = error {
+                    self?.presentVPNError(title: "VPN Disconnect Error", error: error)
+                } else {
+                    self?.connectedVPNService = nil
+                    self?.currentVPNStatus = .disconnected
+                    AppLogger.shared.log("VPN '\(service.name)' disconnected successfully.")
+                }
+            }
+        case .connecting, .disconnecting:
+            return
+        case .disconnected, .unknown:
+            vpnManager.connectVPN(service) { [weak self] error in
+                if let error = error {
+                    self?.presentVPNError(title: "VPN Connection Error", error: error)
+                } else {
+                    self?.connectedVPNService = service
+                    self?.currentVPNStatus = .connected
+                    AppLogger.shared.log("VPN '\(service.name)' connected successfully.")
+                }
+            }
+        }
+        
+        if let menu = statusBarItem?.menu {
+            loadVPNConfigurations(menu: menu)
+        }
+    }
+    
+    private func connectMenuConfiguration(for status: VPNManager.VPNConnectionStatus) -> (title: String, enabled: Bool) {
+        switch status {
+        case .connected:
+            return ("Disconnect", true)
+        case .disconnected:
+            return ("Connect", true)
+        case .connecting:
+            return ("Connecting...", false)
+        case .disconnecting:
+            return ("Disconnecting...", false)
+        case .unknown:
+            return ("Connect", true)
+        }
+    }
+
+    private func statusDescription(_ status: VPNManager.VPNConnectionStatus) -> String {
+        switch status {
+        case .connected: return "connected"
+        case .connecting: return "connecting"
+        case .disconnecting: return "disconnecting"
+        case .disconnected: return "disconnected"
+        case .unknown: return "unknown"
+        }
+    }
+    
+    private func presentVPNError(title: String, error: Error) {
+        print("\(title): \(error)")
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = error.localizedDescription
+        alert.alertStyle = .warning
+        alert.runModal()
+    }
+    
+    @objc func toggleSplittingTunnel() {
+        guard !splittingTunnelOperationInProgress else { return }
+        let targetState = !isSplittingTunnelEnabled
+        let previousState = isSplittingTunnelEnabled
+        AppLogger.shared.log("User toggled Splitting Tunnel -> \(targetState ? "Enable" : "Disable")")
+        
+        splittingTunnelOperationInProgress = true
+        splittingTunnelMenuItem?.isEnabled = false
+        splittingTunnelMenuItem?.state = .mixed
+        
+        if targetState {
+            guard currentVPNStatus == .connected, let service = connectedVPNService else {
+                AppLogger.shared.log("Splitting tunnel enable aborted: no connected VPN.")
+                splittingTunnelOperationInProgress = false
+                splittingTunnelMenuItem?.isEnabled = true
+                splittingTunnelMenuItem?.state = previousState ? .on : .off
+                presentVPNError(title: "Splitting Tunnel Error", error: SplittingTunnelError.noConnectedVPN)
+                return
+            }
+            
+            splittingTunnelManager.enable(for: service) { [weak self] result in
+                DispatchQueue.main.async {
+                    self?.handleSplittingTunnelCompletion(result, targetState: targetState, previousState: previousState)
+                }
+            }
+        } else {
+            splittingTunnelManager.disable { [weak self] result in
+                DispatchQueue.main.async {
+                    self?.handleSplittingTunnelCompletion(result, targetState: targetState, previousState: previousState)
+                }
+            }
+        }
+    }
+    
+    private func handleSplittingTunnelCompletion(_ result: Result<Void, Error>, targetState: Bool, previousState: Bool) {
+        splittingTunnelOperationInProgress = false
+        splittingTunnelMenuItem?.isEnabled = true
+        
+        switch result {
+        case .success:
+            isSplittingTunnelEnabled = targetState
+            splittingTunnelMenuItem?.state = targetState ? .on : .off
+            AppLogger.shared.log("Splitting tunnel is now \(targetState ? "enabled" : "disabled").")
+        case .failure(let error):
+            isSplittingTunnelEnabled = previousState
+            splittingTunnelMenuItem?.state = previousState ? .on : .off
+            presentVPNError(title: "Splitting Tunnel Error", error: error)
+            AppLogger.shared.log("Splitting tunnel toggle failed: \(error.localizedDescription)")
+        }
+    }
+    
+    @objc func openNetworkPreferences() {
+        // 打开系统网络偏好设置
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preferences.network")!)
+    }
+    
+    @objc func quitApp() {
+        NSApplication.shared.terminate(nil)
+    }
+}
