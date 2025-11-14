@@ -1,0 +1,45 @@
+{
+  "" : {
+    "const-values" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN Manager-master.swiftconstvalues",
+    "dependencies" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN Manager-master.d",
+    "diagnostics" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN Manager-master.dia",
+    "emit-module-dependencies" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN Manager-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN Manager-master-emit-module.dia",
+    "swift-dependencies" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN Manager-master.swiftdeps"
+  },
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/AppLogger.swift" : {
+    "index-unit-output-path" : "/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/AppLogger.o",
+    "llvm-bc" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/AppLogger.bc",
+    "object" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/AppLogger.o"
+  },
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/ContentView.swift" : {
+    "index-unit-output-path" : "/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/ContentView.o"
+  },
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/SplittingTunnelManager.swift" : {
+    "index-unit-output-path" : "/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/SplittingTunnelManager.o",
+    "llvm-bc" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/SplittingTunnelManager.bc",
+    "object" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/SplittingTunnelManager.o"
+  },
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/VPNControlView.swift" : {
+    "index-unit-output-path" : "/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPNControlView.o",
+    "llvm-bc" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPNControlView.bc",
+    "object" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPNControlView.o"
+  },
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/VPNModels.swift" : {
+    "index-unit-output-path" : "/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPNModels.o",
+    "llvm-bc" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPNModels.bc",
+    "object" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPNModels.o"
+  },
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/VPN_ManagerApp.swift" : {
+    "index-unit-output-path" : "/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN_ManagerApp.o",
+    "llvm-bc" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN_ManagerApp.bc",
+    "object" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/VPN_ManagerApp.o"
+  },
+  "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "index-unit-output-path" : "/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/Objects-normal/arm64/GeneratedAssetSymbols.o"
+  }
+}

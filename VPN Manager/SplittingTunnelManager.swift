@@ -58,6 +58,9 @@ final class DefaultRouteInfoFetcher {
         guard let store = SCDynamicStoreCreate(nil, "VPN Manager" as CFString, nil, nil),
               let globalIPv4 = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString) as? [String: Any]
         else {
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Route Error", "无法获取网络配置信息")
+            }
             throw SplittingTunnelError.defaultRouteUnavailable
         }
 
@@ -71,6 +74,9 @@ final class DefaultRouteInfoFetcher {
               !isDisallowedInterface(interface),
               let router = globalIPv4["Router"] as? String,
               !router.isEmpty else {
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Route Error", "无法获取默认网关信息")
+            }
             throw SplittingTunnelError.defaultRouteUnavailable
         }
 
@@ -176,7 +182,11 @@ final class ChinaIPDatabase {
             let (data, response) = try await URLSession.shared.data(from: remoteURL)
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                throw SplittingTunnelError.databaseUnavailable("远程服务器响应异常。")
+                let error = SplittingTunnelError.databaseUnavailable("远程服务器响应异常。")
+                DispatchQueue.main.async {
+                    SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Database Error", error.localizedDescription)
+                }
+                throw error
             }
             try fileManager.createDirectory(at: cacheURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: cacheURL, options: .atomic)
@@ -194,7 +204,11 @@ final class ChinaIPDatabase {
                 AppLogger.shared.log("Using fallback China IP database.")
                 return cacheURL
             } catch {
-                throw SplittingTunnelError.databaseUnavailable("无法写入备用 IP 数据。")
+                let error = SplittingTunnelError.databaseUnavailable("无法写入备用 IP 数据。")
+                DispatchQueue.main.async {
+                    SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Database Error", error.localizedDescription)
+                }
+                throw error
             }
         }
     }
@@ -204,13 +218,19 @@ final class PrivilegedCommandRunner {
     private var authorizationRef: AuthorizationRef?
 
     private func ensureAuthorization() throws -> AuthorizationRef {
+        AppLogger.shared.log("Ensuring authorization for privileged operations")
         if let ref = authorizationRef {
+            AppLogger.shared.log("Using existing authorization reference")
             return ref
         }
 
         var authRef: AuthorizationRef?
         let status = AuthorizationCreate(nil, nil, [], &authRef)
         guard status == errAuthorizationSuccess, let ref = authRef else {
+            AppLogger.shared.log("Failed to create authorization reference, status: \(status)")
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Authorization Error", "无法创建授权引用，错误代码: \(status)")
+            }
             throw SplittingTunnelError.authorizationUnavailable
         }
 
@@ -219,10 +239,15 @@ final class PrivilegedCommandRunner {
         let flags: AuthorizationFlags = [.interactionAllowed, .extendRights, .preAuthorize]
         let copyStatus = AuthorizationCopyRights(ref, &rights, nil, flags, nil)
         guard copyStatus == errAuthorizationSuccess else {
+            AppLogger.shared.log("Failed to copy authorization rights, copyStatus: \(copyStatus)")
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Authorization Error", "无法复制授权权限，错误代码: \(copyStatus)")
+            }
             throw SplittingTunnelError.authorizationUnavailable
         }
 
         authorizationRef = ref
+        AppLogger.shared.log("Successfully created and configured new authorization reference")
         return ref
     }
 
@@ -230,10 +255,15 @@ final class PrivilegedCommandRunner {
         if let ref = authorizationRef {
             AuthorizationFree(ref, [])
         }
+        // 清理共享实例
+        if SplittingTunnelManager.sharedInstance === self {
+            SplittingTunnelManager.sharedInstance = nil
+        }
     }
 
     @discardableResult
     func execute(path: String, arguments: [String]) throws -> String {
+        AppLogger.shared.log("Executing privileged command: \(path) \(arguments.joined(separator: " "))")
         let ref = try ensureAuthorization()
 
         var cArguments = arguments.map { strdup($0) }
@@ -247,11 +277,19 @@ final class PrivilegedCommandRunner {
         var pipe: UnsafeMutablePointer<FILE>?
         var status: OSStatus = errAuthorizationSuccess
         cArguments.withUnsafeMutableBufferPointer { buffer in
+            AppLogger.shared.log("Calling AuthorizationExecuteWithPrivileges for: \(path) \(arguments.joined(separator: " "))")
             status = AuthorizationExecuteWithPrivileges(ref, path, [], buffer.baseAddress, &pipe)
         }
         guard status == errAuthorizationSuccess else {
+            let errorMsg = "AuthorizationExecuteWithPrivileges 返回 \(status)"
             AppLogger.shared.log("Command \(path) \(arguments.joined(separator: " ")) failed with status \(status)")
-            throw SplittingTunnelError.commandFailed("AuthorizationExecuteWithPrivileges 返回 \(status)")
+            
+            // 触发UI错误提示
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Command Error", "命令执行失败: \(path) \(arguments.joined(separator: " ")) - 错误代码: \(status)")
+            }
+            
+            throw SplittingTunnelError.commandFailed(errorMsg)
         }
 
         var outputData = Data()
@@ -264,15 +302,25 @@ final class PrivilegedCommandRunner {
         }
 
         let output = String(data: outputData, encoding: .utf8) ?? ""
-        AppLogger.shared.log("Command \(path) \(arguments.joined(separator: " ")) succeeded. Output length=\(output.count)")
+        AppLogger.shared.log("Command \(path) \(arguments.joined(separator: " ")) succeeded. Output length=\(output.count), output preview: \(output.prefix(200))...")
         return output
     }
 
     func ensurePacketFilterEnabled() throws {
+        AppLogger.shared.log("Checking if packet filter is enabled")
         let statusOutput = try execute(path: "/sbin/pfctl", arguments: ["-q", "-si"])
+        AppLogger.shared.log("Packet filter status output: \(statusOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
         guard statusOutput.contains("Status: Enabled") else {
-            _ = try execute(path: "/sbin/pfctl", arguments: ["-q", "-E"])
-            AppLogger.shared.log("Packet filter was disabled. Enabled via pfctl.")
+            AppLogger.shared.log("Packet filter is disabled, attempting to enable it")
+            do {
+                _ = try execute(path: "/sbin/pfctl", arguments: ["-q", "-E"])
+                AppLogger.shared.log("Packet filter was disabled. Enabled via pfctl.")
+            } catch {
+                DispatchQueue.main.async {
+                    SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Error", "无法启用数据包过滤器: \(error.localizedDescription)")
+                }
+                throw error
+            }
             return
         }
         AppLogger.shared.log("Packet filter already enabled.")
@@ -280,12 +328,28 @@ final class PrivilegedCommandRunner {
 
     func loadAnchor(_ anchorName: String, rulesPath: String) throws {
         AppLogger.shared.log("Loading PF anchor \(anchorName) with rules from \(rulesPath)")
-        _ = try execute(path: "/sbin/pfctl", arguments: ["-q", "-a", anchorName, "-f", rulesPath])
+        do {
+            let result = try execute(path: "/sbin/pfctl", arguments: ["-q", "-a", anchorName, "-f", rulesPath])
+            AppLogger.shared.log("PF anchor load result: \(result.trimmingCharacters(in: .whitespacesAndNewlines))")
+        } catch {
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Error", "无法加载PF规则: \(error.localizedDescription)")
+            }
+            throw error
+        }
     }
 
     func flushAnchor(_ anchorName: String) throws {
         AppLogger.shared.log("Flushing PF anchor \(anchorName)")
-        _ = try execute(path: "/sbin/pfctl", arguments: ["-q", "-a", anchorName, "-F", "rules"])
+        do {
+            let result = try execute(path: "/sbin/pfctl", arguments: ["-q", "-a", anchorName, "-F", "rules"])
+            AppLogger.shared.log("PF anchor flush result: \(result.trimmingCharacters(in: .whitespacesAndNewlines))")
+        } catch {
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Error", "无法清除PF规则: \(error.localizedDescription)")
+            }
+            throw error
+        }
     }
 }
 
@@ -305,11 +369,18 @@ final class SplittingTunnelManager {
     private lazy var chinaDatabase = ChinaIPDatabase(workDirectory: workDirectory)
 
     private let anchorName = "com.apple/100.vpnmanager.split"
+    
+    // 错误回调闭包
+    var onError: ((String, String) -> Void)?
+    
+    // 共享实例，用于静态方法访问
+    static var sharedInstance: SplittingTunnelManager?
 
     init() {
         self.workDirectory = SplittingTunnelManager.resolveWorkDirectory()
         self.anchorFileURL = workDirectory.appendingPathComponent("vpnmanager_anchor.conf", isDirectory: false)
         AppLogger.shared.log("SplittingTunnel work directory: \(workDirectory.path)")
+        SplittingTunnelManager.sharedInstance = self
     }
 
     private var isActiveState: Bool {
@@ -428,6 +499,7 @@ final class SplittingTunnelManager {
                                  vpnInterface: String,
                                  vpnGateway: String,
                                  chinaListPath: String) throws {
+        AppLogger.shared.log("Preparing to write PF anchor file with routing configuration")
         let routeTarget = "(\(vpnInterface) \(vpnGateway))"
         AppLogger.shared.log("Writing PF anchor route-to target: \(routeTarget)")
 
@@ -444,29 +516,83 @@ final class SplittingTunnelManager {
         pass out quick on \(localInterface) route-to \(routeTarget) from any to ! <vpnmanager_cn> keep state
         """
         let anchoredText = anchor.hasSuffix("\n") ? anchor : anchor + "\n"
+        AppLogger.shared.log("Anchor file content preview:\n\(anchoredText.prefix(500))...")
         AppLogger.shared.log("Writing anchor file to: \(anchorFileURL.path)")
-        try anchoredText.write(to: anchorFileURL, atomically: true, encoding: .utf8)
+        
+        // 检查目录是否存在，如果不存在则创建
+        let directory = anchorFileURL.deletingLastPathComponent()
+        if !FileManager.default.fileExists(atPath: directory.path) {
+            AppLogger.shared.log("Creating directory for anchor file: \(directory.path)")
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            } catch {
+                DispatchQueue.main.async {
+                    SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel File Error", "无法创建目录: \(directory.path) - \(error.localizedDescription)")
+                }
+                throw error
+            }
+        }
+        
+        do {
+            try anchoredText.write(to: anchorFileURL, atomically: true, encoding: .utf8)
+        } catch {
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel File Error", "无法写入锚点文件: \(self.anchorFileURL.path) - \(error.localizedDescription)")
+            }
+            throw error
+        }
+        
         AppLogger.shared.log("Wrote PF anchor file at \(anchorFileURL.path)")
+        
+        // 验证文件是否成功写入
+        if FileManager.default.fileExists(atPath: anchorFileURL.path) {
+            let attributes = try FileManager.default.attributesOfItem(atPath: anchorFileURL.path)
+            let fileSize = attributes[.size] as? Int ?? 0
+            AppLogger.shared.log("Verified anchor file exists with size: \(fileSize) bytes")
+        } else {
+            let error = SplittingTunnelError.commandFailed("锚点文件写入失败")
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel File Error", error.localizedDescription)
+            }
+            AppLogger.shared.log("Warning: Anchor file does not exist after write operation")
+            throw error
+        }
     }
 
     private func resolveVPNGateway(for service: SystemVPNService, interfaceName: String) -> String? {
-        AppLogger.shared.log("Resolving VPN gateway for service \(service.name) on interface \(interfaceName)")
+        AppLogger.shared.log("Resolving VPN gateway for service \(service.name) (ID: \(service.id)) on interface \(interfaceName)")
         if let store = SCDynamicStoreCreate(nil, "VPN Manager" as CFString, nil, nil) {
+            AppLogger.shared.log("Created SCDynamicStore to check service \(service.name)")
             let ipv4Key = "State:/Network/Service/\(service.id)/IPv4" as CFString
-            if let ipv4 = SCDynamicStoreCopyValue(store, ipv4Key) as? [String: Any],
-               let candidate = Self.extractGateway(from: ipv4) {
-                AppLogger.shared.log("Resolved VPN gateway via IPv4 state: \(candidate)")
-                return candidate
+            if let ipv4 = SCDynamicStoreCopyValue(store, ipv4Key) as? [String: Any] {
+                AppLogger.shared.log("Found IPv4 configuration for service \(service.name), checking for gateway")
+                if let candidate = Self.extractGateway(from: ipv4) {
+                    AppLogger.shared.log("Resolved VPN gateway via IPv4 state: \(candidate)")
+                    return candidate
+                } else {
+                    AppLogger.shared.log("No gateway found in IPv4 configuration for service \(service.name)")
+                }
+            } else {
+                AppLogger.shared.log("No IPv4 configuration found for service \(service.name)")
             }
 
             let pppKey = "State:/Network/Service/\(service.id)/PPP" as CFString
-            if let ppp = SCDynamicStoreCopyValue(store, pppKey) as? [String: Any],
-               let dest = Self.firstString(from: ppp["DestAddress"]) ?? Self.firstString(from: ppp["CommRemoteAddress"]) {
-                AppLogger.shared.log("Resolved VPN gateway via PPP state: \(dest)")
-                return dest
+            if let ppp = SCDynamicStoreCopyValue(store, pppKey) as? [String: Any] {
+                AppLogger.shared.log("Found PPP configuration for service \(service.name), checking for gateway")
+                if let dest = Self.firstString(from: ppp["DestAddress"]) ?? Self.firstString(from: ppp["CommRemoteAddress"]) {
+                    AppLogger.shared.log("Resolved VPN gateway via PPP state: \(dest)")
+                    return dest
+                } else {
+                    AppLogger.shared.log("No gateway found in PPP configuration for service \(service.name)")
+                }
+            } else {
+                AppLogger.shared.log("No PPP configuration found for service \(service.name)")
             }
+        } else {
+            AppLogger.shared.log("Failed to create SCDynamicStore for service \(service.name)")
         }
 
+        AppLogger.shared.log("Attempting to resolve VPN gateway via ifconfig for interface \(interfaceName)")
         if let peer = inferGatewayViaIfconfig(interfaceName: interfaceName) {
             AppLogger.shared.log("Resolved VPN gateway via ifconfig: \(peer)")
             return peer
@@ -477,15 +603,20 @@ final class SplittingTunnelManager {
     }
 
     private static func extractGateway(from ipv4Dict: [String: Any]) -> String? {
+        AppLogger.shared.log("Extracting gateway from IPv4 dictionary: \(ipv4Dict)")
         if let router = firstString(from: ipv4Dict["Router"]) {
+            AppLogger.shared.log("Found router in IPv4 dictionary: \(router)")
             return router
         }
         if let dest = firstString(from: ipv4Dict["DestAddress"]) {
+            AppLogger.shared.log("Found DestAddress in IPv4 dictionary: \(dest)")
             return dest
         }
         if let peer = firstString(from: ipv4Dict["PeerAddress"]) {
+            AppLogger.shared.log("Found PeerAddress in IPv4 dictionary: \(peer)")
             return peer
         }
+        AppLogger.shared.log("No gateway found in IPv4 dictionary")
         return nil
     }
 
@@ -590,6 +721,9 @@ private extension SplittingTunnelManager {
             return true
         } catch {
             AppLogger.shared.log("Cannot use directory \(directory.path) for splitting tunnel data: \(error)")
+            DispatchQueue.main.async {
+                SplittingTunnelManager.sharedInstance?.onError?("Splitting Tunnel Directory Error", "无法创建目录: \(directory.path) - \(error.localizedDescription)")
+            }
             return false
         }
     }

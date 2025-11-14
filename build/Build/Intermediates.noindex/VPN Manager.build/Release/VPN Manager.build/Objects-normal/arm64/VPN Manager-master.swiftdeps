@@ -1,0 +1,13 @@
+version: "Apple Swift version 6.1.2 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)"
+options: "0688b4d977e3affa8d0fa7a73a6c78de2920a90ede9f2a0b2dc11ceefbf825d3"
+build_start_time: [1762956107, 334017000]
+build_end_time: [1762956109, 797660000]
+inputs:
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/AppLogger.swift": [1762867519, 439634643]
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/ContentView.swift": [1762855115, 495529690]
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/SplittingTunnelManager.swift": [1762955952, 728641257]
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/VPNControlView.swift": [1762956000, 809992317]
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/VPNModels.swift": [1762922286, 608756396]
+  "/Users/siberia/Desktop/VPN/VPN Manager/VPN Manager/VPN_ManagerApp.swift": [1762956095, 721193210]
+  ? "/Users/siberia/Desktop/VPN/VPN Manager/build/Build/Intermediates.noindex/VPN Manager.build/Release/VPN Manager.build/DerivedSources/GeneratedAssetSymbols.swift"
+  : [1762955232, 490984467]

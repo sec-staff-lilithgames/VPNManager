@@ -1,0 +1,2 @@
+Target dependency graph (1 target)
+Target 'VPN Manager' in project 'VPN Manager' (no dependencies)

@@ -261,7 +261,20 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
     private var splittingTunnelMenuItem: NSMenuItem?
     private var isSplittingTunnelEnabled = false
     private let vpnManager = VPNManager()
-    private let splittingTunnelManager = SplittingTunnelManager()
+    private let splittingTunnelManager: SplittingTunnelManager = {
+        let manager = SplittingTunnelManager()
+        manager.onError = { title, message in
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = title
+                alert.informativeText = message
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+        }
+        return manager
+    }()
     private var connectedVPNService: SystemVPNService?
     private var splittingTunnelOperationInProgress = false
     private var vpnMenuItems: [NSMenuItem] = []
@@ -465,16 +478,31 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
     }
 
     private func ensureSplittingTunnelAvailability() {
-        guard isSplittingTunnelEnabled else { return }
-        guard let _ = connectedVPNService, currentVPNStatus == .connected else {
-            AppLogger.shared.log("Splitting tunnel auto-disable: VPN not connected.")
+        AppLogger.shared.log("Ensuring splitting tunnel availability, current state: \(isSplittingTunnelEnabled), VPN status: \(statusDescription(currentVPNStatus))")
+        guard isSplittingTunnelEnabled else { 
+            AppLogger.shared.log("Splitting tunnel is not enabled, nothing to check")
+            return 
+        }
+        guard let connectedService = connectedVPNService, currentVPNStatus == .connected else {
+            AppLogger.shared.log("Splitting tunnel auto-disable: VPN not connected. Connected service: \(connectedVPNService?.name ?? "none"), VPN status: \(statusDescription(currentVPNStatus))")
             if splittingTunnelManager.isActive {
-                splittingTunnelManager.disable { _ in }
+                AppLogger.shared.log("Splitting tunnel is active, disabling it due to VPN disconnection")
+                splittingTunnelManager.disable { result in
+                    switch result {
+                    case .success:
+                        AppLogger.shared.log("Splitting tunnel successfully disabled after VPN disconnection")
+                    case .failure(let error):
+                        AppLogger.shared.log("Failed to disable splitting tunnel after VPN disconnection: \(error.localizedDescription)")
+                    }
+                }
+            } else {
+                AppLogger.shared.log("Splitting tunnel is not active, no need to disable")
             }
             isSplittingTunnelEnabled = false
             splittingTunnelMenuItem?.state = .off
             return
         }
+        AppLogger.shared.log("Splitting tunnel availability check passed: VPN is connected (\(connectedService.name))")
     }
 
     @objc func statusBarButtonClicked() {
@@ -564,6 +592,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
     }
     
     @objc func toggleSplittingTunnel() {
+        AppLogger.shared.log("Toggle Splitting Tunnel requested. Current state: \(isSplittingTunnelEnabled), operation in progress: \(splittingTunnelOperationInProgress), VPN status: \(statusDescription(currentVPNStatus)), connected service: \(connectedVPNService?.name ?? "none")")
         guard !splittingTunnelOperationInProgress else { 
             AppLogger.shared.log("Splitting tunnel operation already in progress, skipping request")
             return 
@@ -577,8 +606,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
         splittingTunnelMenuItem?.state = .mixed
         
         if targetState {
+            AppLogger.shared.log("Attempting to enable Splitting Tunnel")
             guard currentVPNStatus == .connected, let service = connectedVPNService else {
-                AppLogger.shared.log("Splitting tunnel enable aborted: no connected VPN.")
+                AppLogger.shared.log("Splitting tunnel enable aborted: no connected VPN. Current status: \(statusDescription(currentVPNStatus)), connected service: \(connectedVPNService?.name ?? "none")")
                 splittingTunnelOperationInProgress = false
                 splittingTunnelMenuItem?.isEnabled = true
                 splittingTunnelMenuItem?.state = previousState ? .on : .off
@@ -586,14 +616,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
                 return
             }
             
+            AppLogger.shared.log("Calling SplittingTunnelManager.enable for service: \(service.name) (ID: \(service.id))")
             splittingTunnelManager.enable(for: service) { [weak self] result in
                 DispatchQueue.main.async {
+                    AppLogger.shared.log("SplittingTunnelManager.enable completed with result: \(result), calling completion handler")
                     self?.handleSplittingTunnelCompletion(result, targetState: targetState, previousState: previousState)
                 }
             }
         } else {
+            AppLogger.shared.log("Calling SplittingTunnelManager.disable")
             splittingTunnelManager.disable { [weak self] result in
                 DispatchQueue.main.async {
+                    AppLogger.shared.log("SplittingTunnelManager.disable completed with result: \(result), calling completion handler")
                     self?.handleSplittingTunnelCompletion(result, targetState: targetState, previousState: previousState)
                 }
             }
@@ -601,7 +635,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
     }
     
     private func handleSplittingTunnelCompletion(_ result: Result<Void, Error>, targetState: Bool, previousState: Bool) {
-        AppLogger.shared.log("Handling splitting tunnel completion, target state: \(targetState)")
+        AppLogger.shared.log("Handling splitting tunnel completion, target state: \(targetState), previous state: \(previousState)")
         splittingTunnelOperationInProgress = false
         splittingTunnelMenuItem?.isEnabled = true
         
@@ -616,6 +650,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
             presentVPNError(title: "Splitting Tunnel Error", error: error)
             AppLogger.shared.log("Splitting tunnel toggle failed: \(error.localizedDescription)")
         }
+        
+        // 验证最终状态
+        AppLogger.shared.log("Splitting tunnel final state verification - enabled flag: \(isSplittingTunnelEnabled), menu item state: \(splittingTunnelMenuItem?.state.rawValue ?? -1), manager active: \(splittingTunnelManager.isActive)")
     }
     
     @objc func openNetworkPreferences() {
