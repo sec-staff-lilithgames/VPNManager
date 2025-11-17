@@ -9,6 +9,7 @@ import SwiftUI
 import AppKit
 import SystemConfiguration
 import Foundation
+import Carbon
 
 @main
 struct VPN_ManagerApp: App {
@@ -276,14 +277,33 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
         return manager
     }()
     private var connectedVPNService: SystemVPNService?
+    private var preferredVPNService: SystemVPNService?
     private var splittingTunnelOperationInProgress = false
     private var vpnMenuItems: [NSMenuItem] = []
     private var vpnStatusItems: [NSMenuItem] = []
     private var vpnControlViews: [VPNControlView] = []
+    private var availableVPNServices: [SystemVPNService] = []
+    private var shortcutsWindow: NSWindow?
+    
+    private enum ShortcutHotKey: UInt32 {
+        case toggleCurrentVPN = 1
+    }
+    
+    private let shortcutHotKeySignature: OSType = 0x56504E4D // 'VPNM'
+    private var hotKeyEventHandler: EventHandlerRef?
+    private var registeredHotKeys: [ShortcutHotKey: EventHotKeyRef?] = [:]
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        unregisterHotKeys()
+    }
     
     // MARK: - VPNControlDelegate
     func setConnectedVPNService(_ service: SystemVPNService?) {
         connectedVPNService = service
+        if let service = service {
+            preferredVPNService = service
+        }
         // 更新状态栏图标
         currentVPNStatus = service != nil ? .connected : .disconnected
     }
@@ -341,7 +361,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
         }
         
         button.image = image
-        button.contentTintColor = paletteColors?.first
+        button.contentTintColor = paletteColors == nil ? nil : paletteColors!.first
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -370,6 +390,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
         splittingTunnelMenuItem?.state = isSplittingTunnelEnabled ? .on : .off
         menu.addItem(splittingTunnelMenuItem!)
         
+        // 添加快捷方式菜单项
+        let shortcutsMenuItem = NSMenuItem(title: "Shortcuts", action: #selector(showShortcuts), keyEquivalent: "")
+        shortcutsMenuItem.image = NSImage(systemSymbolName: "command", accessibilityDescription: "Shortcuts")
+        menu.addItem(shortcutsMenuItem)
+        
         // 添加VPN列表分隔符
         menu.addItem(NSMenuItem.separator())
         
@@ -382,6 +407,272 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
         menu.addItem(NSMenuItem(title: "Quit VPN Manager", action: #selector(quitApp), keyEquivalent: "q"))
 
         statusBarItem?.menu = menu
+        
+        setupShortcutIntegration()
+    }
+    
+    @objc func showShortcuts() {
+        // 创建快捷方式面板窗口
+        if shortcutsWindow == nil {
+            let contentView = ShortcutsView()
+            let controller = NSHostingController(rootView: contentView)
+            
+            let window = NSWindow(
+                contentRect: NSMakeRect(0, 0, 300, 400),
+                styleMask: [.titled, .closable, .resizable],
+                backing: .buffered,
+                defer: false
+            )
+            window.center()
+            window.title = "Shortcuts"
+            window.isReleasedWhenClosed = false
+            window.contentViewController = controller
+            
+            shortcutsWindow = window
+        }
+        
+        shortcutsWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    private func setupShortcutIntegration() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleShortcutNotification(_:)),
+            name: .shortcutActionRequested,
+            object: nil
+        )
+        registerDefaultHotkeysIfPossible()
+    }
+    
+    private func registerDefaultHotkeysIfPossible() {
+        installHotKeyHandlerIfNeeded()
+        let status = registerHotKey(identifier: .toggleCurrentVPN,
+                                    keyCode: UInt32(kVK_ANSI_A),
+                                    modifiers: UInt32(controlKey))
+        if status == noErr {
+            AppLogger.shared.log("Registered Control + A shortcut for toggling current VPN.")
+        } else if status == eventHotKeyExistsErr {
+            AppLogger.shared.log("Control + A shortcut registration skipped because the combination is already used by another application.")
+        } else {
+            AppLogger.shared.log("Failed to register Control + A shortcut. OSStatus=\(status)")
+        }
+    }
+    
+    private func installHotKeyHandlerIfNeeded() {
+        guard hotKeyEventHandler == nil else { return }
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+        
+        let callback: EventHandlerUPP = { _, eventRef, userData in
+            guard let userData = userData else { return noErr }
+            let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
+            return delegate.handleHotKey(eventRef: eventRef)
+        }
+        
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            callback,
+            1,
+            &eventType,
+            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+            &hotKeyEventHandler
+        )
+    }
+    
+    @discardableResult
+    private func registerHotKey(identifier: ShortcutHotKey,
+                                keyCode: UInt32,
+                                modifiers: UInt32) -> OSStatus {
+        var hotKeyRef: EventHotKeyRef?
+        var hotKeyID = EventHotKeyID(signature: shortcutHotKeySignature, id: identifier.rawValue)
+        let status = RegisterEventHotKey(
+            keyCode,
+            modifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyRef
+        )
+        
+        if status == noErr {
+            registeredHotKeys[identifier] = hotKeyRef
+        }
+        
+        return status
+    }
+    
+    private func unregisterHotKeys() {
+        for (_, hotKeyRef) in registeredHotKeys {
+            if let hotKeyRef = hotKeyRef {
+                UnregisterEventHotKey(hotKeyRef)
+            }
+        }
+        registeredHotKeys.removeAll()
+    }
+    
+    @objc private func handleShortcutNotification(_ notification: Notification) {
+        guard
+            let rawValue = notification.userInfo?["action"] as? String,
+            let action = ShortcutAction(rawValue: rawValue)
+        else {
+            return
+        }
+        performShortcutAction(action)
+    }
+    
+    private func performShortcutAction(_ action: ShortcutAction, preferredService: SystemVPNService? = nil) {
+        switch action {
+        case .connectCurrentVPN:
+            guard let target = resolveServiceForShortcutConnection(preferredService: preferredService) else {
+                AppLogger.shared.log("Connect shortcut ignored because no VPN service is available.")
+                presentInformationalAlert(title: "没有可用的VPN", message: "无法触发连接操作，因为当前没有发现任何VPN配置。")
+                return
+            }
+            AppLogger.shared.log("Shortcut connect request for VPN: \(target.name)")
+            connectServiceViaShortcut(target)
+        case .disconnectCurrentVPN:
+            guard let target = resolveServiceForShortcutDisconnection(preferredService: preferredService) else {
+                AppLogger.shared.log("Disconnect shortcut ignored because no VPN connection is active.")
+                presentInformationalAlert(title: "没有正在连接的VPN", message: "当前没有需要断开的VPN连接。")
+                return
+            }
+            AppLogger.shared.log("Shortcut disconnect request for VPN: \(target.name)")
+            disconnectServiceViaShortcut(target)
+        }
+    }
+    
+    private func resolveServiceForShortcutConnection(preferredService: SystemVPNService?) -> SystemVPNService? {
+        if let preferredService = preferredService {
+            return preferredService
+        }
+        if let connected = connectedVPNService {
+            let status = vpnManager.connectionStatus(for: connected)
+            if status == .disconnected || status == .unknown {
+                return connected
+            }
+        }
+        if let lastPreferred = preferredVPNService {
+            return lastPreferred
+        }
+        return availableVPNServices.first
+    }
+    
+    private func resolveServiceForShortcutDisconnection(preferredService: SystemVPNService?) -> SystemVPNService? {
+        if let preferredService = preferredService {
+            return preferredService
+        }
+        if let connected = connectedVPNService {
+            return connected
+        }
+        if let lastPreferred = preferredVPNService {
+            let status = vpnManager.connectionStatus(for: lastPreferred)
+            if status == .connected || status == .connecting {
+                return lastPreferred
+            }
+        }
+        return nil
+    }
+    
+    private func connectServiceViaShortcut(_ service: SystemVPNService) {
+        currentVPNStatus = .connecting
+        vpnManager.connectVPN(service) { [weak self] error in
+            guard let self = self else { return }
+            if let error = error {
+                self.currentVPNStatus = .disconnected
+                self.presentVPNError(title: "VPN Connection Error", error: error)
+                return
+            }
+            self.vpnManager.waitForStatus(for: service, desiredStatus: .connected) { [weak self] finalStatus in
+                guard let self = self else { return }
+                if finalStatus == .connected {
+                    self.setConnectedVPNService(service)
+                    AppLogger.shared.log("Shortcut connect confirmed for \(service.name).")
+                } else {
+                    self.presentInformationalAlert(title: "连接未完成", message: "VPN \(service.name) 未能在超时时间内建立连接。")
+                    self.currentVPNStatus = .disconnected
+                }
+                self.refreshMenuUI()
+            }
+        }
+    }
+    
+    private func disconnectServiceViaShortcut(_ service: SystemVPNService) {
+        currentVPNStatus = .disconnecting
+        vpnManager.disconnectVPN(service) { [weak self] error in
+            guard let self = self else { return }
+            if let error = error {
+                self.currentVPNStatus = .connected
+                self.presentVPNError(title: "VPN Disconnect Error", error: error)
+                return
+            }
+            self.vpnManager.waitForStatus(for: service, desiredStatus: .disconnected) { [weak self] finalStatus in
+                guard let self = self else { return }
+                if finalStatus == .disconnected {
+                    self.setConnectedVPNService(nil)
+                    AppLogger.shared.log("Shortcut disconnect confirmed for \(service.name).")
+                } else {
+                    self.presentInformationalAlert(title: "断开未完成", message: "VPN \(service.name) 未能在超时时间内断开。")
+                    self.currentVPNStatus = .connected
+                }
+                self.refreshMenuUI()
+            }
+        }
+    }
+    
+    private func refreshMenuUI() {
+        guard let menu = statusBarItem?.menu else { return }
+        loadVPNConfigurations(menu: menu)
+    }
+    
+    private func handleHotKey(eventRef: EventRef?) -> OSStatus {
+        guard let eventRef = eventRef else { return noErr }
+        var hotKeyID = EventHotKeyID()
+        let result = GetEventParameter(
+            eventRef,
+            UInt32(kEventParamDirectObject),
+            UInt32(typeEventHotKeyID),
+            nil,
+            MemoryLayout<EventHotKeyID>.size,
+            nil,
+            &hotKeyID
+        )
+        
+        guard result == noErr,
+              hotKeyID.signature == shortcutHotKeySignature,
+              let identifier = ShortcutHotKey(rawValue: hotKeyID.id)
+        else {
+            return noErr
+        }
+        
+        switch identifier {
+        case .toggleCurrentVPN:
+            handleToggleCurrentVPNShortcut()
+        }
+        
+        return noErr
+    }
+    
+    private func handleToggleCurrentVPNShortcut() {
+        if let connectedService = connectedVPNService {
+            let status = vpnManager.connectionStatus(for: connectedService)
+            if status == .connected || status == .connecting {
+                performShortcutAction(.disconnectCurrentVPN, preferredService: connectedService)
+                return
+            }
+        }
+        performShortcutAction(.connectCurrentVPN)
+    }
+    
+    private func presentInformationalAlert(title: String, message: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
     
     private func loadVPNConfigurations(menu: NSMenu) {
@@ -407,6 +698,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, VPNControlDe
 
     private func applyVPNConfigurations(servicesWithStatus: [(SystemVPNService, VPNManager.VPNConnectionStatus)], menu: NSMenu) {
         AppLogger.shared.log("Applying VPN configurations, count: \(servicesWithStatus.count)")
+        availableVPNServices = servicesWithStatus.map { $0.0 }
         var detectedConnectedService: SystemVPNService?
         var prioritizedStatus: VPNManager.VPNConnectionStatus = .disconnected
 
