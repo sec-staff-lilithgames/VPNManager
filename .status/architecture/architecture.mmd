@@ -1,0 +1,53 @@
+flowchart LR
+    repo["VPN Manager repo"]
+    xcode["VPN Manager.xcodeproj
+Xcode project"]
+    build["BuildArtifacts/CodexBuild
+CLI build outputs"]
+    tests["VPN ManagerTests"]
+    uitests["VPN ManagerUITests"]
+
+    subgraph app["VPN Manager/ app target"]
+        entry["VPN_ManagerApp.swift
+App entry shell"]
+        bar["VPNStatusBarController.swift
+status item + menu coordinator"]
+        hotkey["VPNShortcutController.swift
+Carbon hotkey registration"]
+        flow["VPNInteractionController.swift
+shared connect/disconnect workflow"]
+        ui["VPNControlView / ShortcutsView
+views"]
+        vpnmgr["VPNManager.swift
+system VPN discovery + scutil control"]
+        shortcuts["ShortcutSupport.swift
+shortcut action enum"]
+        models["VPNModels.swift
+service model"]
+        logger["AppLogger.swift
+logging"]
+    end
+
+    repo --> xcode
+    repo --> build
+    xcode --> app
+    xcode --> tests
+    xcode --> uitests
+    entry --> bar
+    entry --> hotkey
+    entry --> flow
+    bar --> ui
+    bar --> flow
+    bar --> shortcuts
+    hotkey --> shortcuts
+    hotkey --> bar
+    ui --> flow
+    ui <--> models
+    flow --> vpnmgr
+    flow --> models
+    vpnmgr --> logger
+    flow --> logger
+    bar --> logger
+    hotkey --> logger
+    tests --> app
+    uitests --> app

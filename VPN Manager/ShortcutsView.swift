@@ -6,35 +6,22 @@
 //
 
 import SwiftUI
-import AppKit
-
-enum ShortcutAction: String {
-    case connectCurrentVPN
-    case disconnectCurrentVPN
-}
-
-extension Notification.Name {
-    static let shortcutActionRequested = Notification.Name("VPNManagerShortcutActionRequested")
-}
 
 private struct ShortcutItem: Identifiable, Hashable {
     let id = UUID()
     let title: String
     let keyDescription: String
-    let action: ShortcutAction?
+    let action: ShortcutAction
 }
 
 struct ShortcutsView: View {
     @State private var isExecuting: Bool = false
     @State private var executionResult: String = ""
+    let onAction: (ShortcutAction) -> Void
+    let onClose: () -> Void
     
     private let availableShortcuts: [ShortcutItem] = [
-        ShortcutItem(title: "连接当前VPN", keyDescription: "Control + A", action: .connectCurrentVPN),
-        ShortcutItem(title: "断开当前VPN", keyDescription: "Control + A", action: .disconnectCurrentVPN),
-        ShortcutItem(title: "启用分流隧道", keyDescription: "自定义", action: nil),
-        ShortcutItem(title: "禁用分流隧道", keyDescription: "自定义", action: nil),
-        ShortcutItem(title: "打开网络偏好设置", keyDescription: "自定义", action: nil),
-        ShortcutItem(title: "快速诊断", keyDescription: "自定义", action: nil)
+        ShortcutItem(title: "切换当前 VPN", keyDescription: "Control + A", action: .toggleCurrentVPN)
     ]
     
     var body: some View {
@@ -84,7 +71,7 @@ struct ShortcutsView: View {
                 Spacer()
                 
                 Button("关闭") {
-                    // 关闭窗口的逻辑将在父级实现
+                    onClose()
                 }
                 .keyboardShortcut(.cancelAction)
             }
@@ -96,28 +83,12 @@ struct ShortcutsView: View {
     private func executeShortcut(_ shortcut: ShortcutItem) {
         isExecuting = true
         executionResult = ""
-        
-        guard let action = shortcut.action else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                executionResult = "暂未为“\(shortcut.title)”配置可执行操作。"
-                isExecuting = false
-            }
-            return
-        }
-        
-        NotificationCenter.default.post(
-            name: .shortcutActionRequested,
-            object: nil,
-            userInfo: ["action": action.rawValue]
-        )
+
+        onAction(shortcut.action)
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             executionResult = "已触发“\(shortcut.title)”快捷操作。"
             isExecuting = false
         }
     }
-}
-
-#Preview {
-    ShortcutsView()
 }
